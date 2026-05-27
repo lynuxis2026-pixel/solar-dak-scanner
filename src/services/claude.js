@@ -66,14 +66,23 @@ const DEMO_ANALYSES = {
   }
 };
 
-async function analyseerDak(imageBuffer, mimeType, gebouwType) {
+async function analyseerDak(imageBuffer, mimeType, gebouwType, handmatigOppervlak = null) {
   if (DEMO_MODE || !imageBuffer) {
-    return DEMO_ANALYSES[gebouwType] || DEMO_ANALYSES.bedrijf;
+    const demo = { ...(DEMO_ANALYSES[gebouwType] || DEMO_ANALYSES.bedrijf) };
+    if (handmatigOppervlak && handmatigOppervlak > 0) {
+      demo.dakoppervlak_m2 = Math.round(handmatigOppervlak);
+      demo.bruikbaar_oppervlak_m2 = Math.round(handmatigOppervlak * 0.75);
+    }
+    return demo;
   }
 
   const base64 = imageBuffer.toString('base64');
 
-  const prompt = `Je bent een expert solar installateur die een satellietfoto van een dak analyseert.
+  const oppNoot = handmatigOppervlak && handmatigOppervlak > 0
+    ? `\nLET OP: De gebruiker heeft een dakcontour ingetekend van ${Math.round(handmatigOppervlak)} m². Gebruik dit als dakoppervlak_m2 en schat bruikbaar_oppervlak_m2 op basis van de zichtbare obstakels binnen dat vlak.`
+    : '';
+
+  const prompt = `Je bent een expert solar installateur die een satellietfoto van een dak analyseert.${oppNoot}
 
 Analyseer deze satellietfoto zorgvuldig en geef een JSON-object terug met EXACT deze velden:
 {

@@ -15,9 +15,30 @@ const GEBOUWTYPE_LABELS = {
   school: 'School / Onderwijsinstelling'
 };
 
+// GET /analyse/locatie — geocodeer adres en geef satelliet URL terug
+router.get('/locatie', async (req, res) => {
+  const { adres } = req.query;
+  if (!adres?.trim()) return res.status(400).json({ error: 'Adres verplicht' });
+  try {
+    const locatie = await maps.geocodeer(adres.trim());
+    const kaartUrl = maps.bouwKaartUrl(locatie.lat, locatie.lng);
+    const metersPerPixel = 156543.03392 * Math.cos(locatie.lat * Math.PI / 180) / Math.pow(2, 20);
+    res.json({
+      lat: locatie.lat,
+      lng: locatie.lng,
+      formatted_address: locatie.formatted_address,
+      kaartUrl,
+      metersPerPixel,
+      demoModus: maps.DEMO_MODE
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // POST /analyse — analyseer adres en genereer rapport
 router.post('/', async (req, res) => {
-  const { adres, gebouwType = 'bedrijf' } = req.body;
+  const { adres, gebouwType = 'bedrijf', handmatigOppervlak } = req.body;
 
   if (!adres || !adres.trim()) {
     return res.status(400).json({ error: 'Adres is verplicht' });
@@ -34,7 +55,8 @@ router.post('/', async (req, res) => {
     const dakAnalyse = await claude.analyseerDak(
       imageBuffer,
       'image/png',
-      gebouwType
+      gebouwType,
+      handmatigOppervlak ? Number(handmatigOppervlak) : null
     );
 
     // 4. Bereken financieel potentieel

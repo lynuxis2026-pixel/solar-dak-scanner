@@ -141,6 +141,27 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
 /* Counter animatie */
 .counter { display: inline-block; }
 
+/* ── TEKEN SCHERM ── */
+#tekenScherm { display: none; max-width: 660px; margin: 0 auto; padding: 40px 20px 60px; }
+.teken-header { text-align: center; margin-bottom: 22px; }
+.teken-header h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+.teken-sub { font-size: 14px; color: #94A3B8; margin-bottom: 4px; }
+.canvas-wrap { position: relative; width: 100%; max-width: 620px; aspect-ratio: 1; margin: 0 auto 14px; background: #0F172A; border: 2px solid #334155; border-radius: 12px; overflow: hidden; cursor: crosshair; }
+.canvas-wrap.gesloten { cursor: default; border-color: var(--oranje); }
+#satellietImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#tekenCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+.opp-badge { text-align: center; font-size: 13px; color: #64748B; margin-bottom: 16px; min-height: 20px; }
+.opp-badge strong { color: var(--oranje); font-size: 17px; }
+.teken-acties { display: flex; gap: 10px; }
+.btn-teken-reset { background: transparent; border: 1.5px solid #475569; border-radius: 10px; padding: 12px 18px; font-size: 13px; font-weight: 600; color: #94A3B8; cursor: pointer; transition: all .2s; white-space: nowrap; }
+.btn-teken-reset:hover { border-color: var(--oranje); color: var(--oranje); }
+.btn-teken-skip { background: transparent; border: 1.5px solid #334155; border-radius: 10px; padding: 12px 18px; font-size: 13px; color: #64748B; cursor: pointer; transition: all .2s; white-space: nowrap; }
+.btn-teken-skip:hover { border-color: #475569; color: #94A3B8; }
+.btn-analyseer { flex: 1; background: var(--oranje); border: none; border-radius: 10px; padding: 12px; font-size: 14px; font-weight: 700; color: white; cursor: pointer; transition: all .2s; }
+.btn-analyseer:hover:not(:disabled) { background: #EA6A0A; transform: translateY(-1px); box-shadow: 0 6px 20px rgba(249,115,22,.35); }
+.btn-analyseer:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
+.teken-hint { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #93C5FD; margin-bottom: 14px; display: flex; gap: 8px; }
+
 /* Responsive */
 @media(max-width: 640px) { .form-row { grid-template-columns: 1fr; } .type-grid { grid-template-columns: repeat(3,1fr); } }
 </style>
@@ -151,25 +172,25 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
 <div id="startScherm">
   <div class="hero">
     <div class="badge">AI-Powered Dakanalyse</div>
-    <h1>Ontdek het zonne­potentieel<br>van <span>elk dak</span></h1>
-    <p>Voer een adres in — onze AI analyseert het dak via satelliet en berekent in seconden uw volledige besparing, rendement en terugverdientijd.</p>
+    <h1>Ontdek het zonne­potentieel<br>van <span>uw pand</span></h1>
+    <p>Woning, bedrijf of sporthal — voer een adres in, teken uw dak af op de satellietfoto en ontvang een volledig rapport met besparing en terugverdientijd.</p>
   </div>
 
   <div style="max-width:640px;margin:0 auto;padding:0 20px 60px">
     <div class="form-card">
       <p style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:16px">Gebouwtype</p>
       <div class="type-grid">
-        <div class="type-btn active" data-type="gym" onclick="selectType(this)"><span class="icon">🏋️</span>Gymzaal</div>
-        <div class="type-btn" data-type="magazijn" onclick="selectType(this)"><span class="icon">🏭</span>Magazijn</div>
+        <div class="type-btn active" data-type="woning" onclick="selectType(this)"><span class="icon">🏠</span>Woning</div>
         <div class="type-btn" data-type="bedrijf" onclick="selectType(this)"><span class="icon">🏢</span>Kantoor</div>
+        <div class="type-btn" data-type="gym" onclick="selectType(this)"><span class="icon">🏋️</span>Gymzaal</div>
         <div class="type-btn" data-type="school" onclick="selectType(this)"><span class="icon">🏫</span>School</div>
-        <div class="type-btn" data-type="woning" onclick="selectType(this)"><span class="icon">🏠</span>Woning</div>
+        <div class="type-btn" data-type="magazijn" onclick="selectType(this)"><span class="icon">🏭</span>Magazijn</div>
       </div>
       <p style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:12px">Adres</p>
       <div class="form-row">
-        <input type="text" id="adresInput" placeholder="bijv. Sportlaan 1, Amsterdam" autocomplete="off"
-          onkeydown="if(event.key==='Enter') startScan()">
-        <button class="btn-scan" onclick="startScan()" style="width:auto;padding:14px 24px">
+        <input type="text" id="adresInput" placeholder="bijv. Kerkstraat 12, Amsterdam" autocomplete="off"
+          onkeydown="if(event.key==='Enter') zoekLocatie()">
+        <button class="btn-scan" onclick="zoekLocatie()" style="width:auto;padding:14px 24px">
           <span>Scan</span> <span>🛰️</span>
         </button>
       </div>
@@ -185,6 +206,40 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
       <div><div style="font-size:24px;font-weight:800;color:var(--blauw)">25jr</div><div style="font-size:12px;color:#64748B">Projectie</div></div>
     </div>
   </div>
+</div>
+
+<!-- TEKEN SCHERM -->
+<div id="tekenScherm">
+  <div class="teken-header">
+    <div class="badge">Stap 2 — Dak omlijnen</div>
+    <h2>Teken uw dakoppervlak</h2>
+    <p class="teken-sub" id="tekenAdresLabel" style="color:var(--oranje);font-weight:600"></p>
+    <p class="teken-sub" id="tekenInstructie">Klik op het dak om punten te plaatsen &mdash; klik op het groene startpunt om de omlijning te sluiten</p>
+  </div>
+
+  <div class="teken-hint">
+    <span>💡</span>
+    <span>Teken zo nauwkeurig mogelijk langs de dakrand. Hoe nauwkeuriger de contour, hoe preciezer de berekening. U kunt ook op <strong>Overslaan</strong> klikken voor automatische schatting.</span>
+  </div>
+
+  <div class="canvas-wrap" id="canvasWrap">
+    <img id="satellietImg" alt="Satellietfoto" />
+    <canvas id="tekenCanvas"></canvas>
+  </div>
+
+  <div class="opp-badge" id="oppBadge">Teken een omlijning om het dakoppervlak te berekenen</div>
+
+  <div class="teken-acties">
+    <button class="btn-teken-reset" onclick="resetPolygoon()">↺ Opnieuw</button>
+    <button class="btn-teken-skip" onclick="slaPolygoonOver()">Overslaan →</button>
+    <button class="btn-analyseer" id="btnAnalyseer" disabled onclick="voerAnalyseMetPolygoon()">
+      Analyseer dak
+    </button>
+  </div>
+
+  <p style="text-align:center;font-size:12px;color:#475569;margin-top:14px">
+    <button onclick="nieuweAnalyse()" style="background:none;border:none;color:#64748B;font-size:12px;cursor:pointer;text-decoration:underline">← Terug naar zoeken</button>
+  </p>
 </div>
 
 <!-- LADEN -->
@@ -323,7 +378,14 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
 <script>
 let huidigeData = null;
 let panelActief = true;
-let gekozenType = 'gym';
+let gekozenType = 'woning';
+
+// Polygon drawing state
+let tekenPunten = [];
+let tekenGesloten = false;
+let mppHuidig = 0.092;
+let hoverPunt = null;
+let locatieData = null;
 
 function selectType(el) {
   document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
@@ -331,10 +393,206 @@ function selectType(el) {
   gekozenType = el.dataset.type;
 }
 
-async function startScan() {
+async function zoekLocatie() {
   const adres = document.getElementById('adresInput').value.trim();
   if (!adres) { document.getElementById('adresInput').focus(); return; }
-  await voerAnalyseUit({ adres, gebouwType: gekozenType });
+
+  const btn = document.querySelector('#startScherm .btn-scan:not([onclick*="Demo"])');
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span>Zoeken...</span>'; }
+
+  try {
+    const r = await fetch('/analyse/locatie?adres=' + encodeURIComponent(adres));
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'Locatie niet gevonden');
+    locatieData = data;
+    toonTekenScherm(data);
+  } catch (err) {
+    alert('Fout: ' + err.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.innerHTML = '<span>Scan</span> <span>🛰️</span>'; }
+  }
+}
+
+function toonTekenScherm(data) {
+  document.getElementById('startScherm').style.display = 'none';
+  document.getElementById('tekenScherm').style.display = 'block';
+  document.getElementById('tekenAdresLabel').textContent = data.formatted_address;
+  mppHuidig = data.metersPerPixel || 0.092;
+  tekenPunten = [];
+  tekenGesloten = false;
+  hoverPunt = null;
+
+  const img = document.getElementById('satellietImg');
+  if (data.kaartUrl) {
+    img.src = data.kaartUrl;
+    img.style.display = 'block';
+    document.getElementById('tekenInstructie').textContent = 'Klik op het dak om punten te plaatsen — klik op het groene startpunt om de omlijning te sluiten';
+  } else {
+    img.style.display = 'none';
+    document.getElementById('canvasWrap').style.background = 'linear-gradient(135deg, #1a2744, #2d3748)';
+    document.getElementById('tekenInstructie').textContent = 'Demo-modus: geen satellietfoto. Klik op Overslaan voor automatische schatting.';
+  }
+
+  const canvas = document.getElementById('tekenCanvas');
+  canvas.width = 640; canvas.height = 640;
+  canvas.style.cursor = 'crosshair';
+  document.getElementById('canvasWrap').classList.remove('gesloten');
+
+  canvas.onclick = handleTekenKlik;
+  canvas.onmousemove = handleTekenHover;
+  canvas.onmouseleave = () => { hoverPunt = null; tekenCanvas(); };
+  canvas.ontouchstart = e => { e.preventDefault(); handleTekenKlik(e.touches[0]); };
+
+  tekenCanvas();
+  bijwerkBtnAnalyseer();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function handleTekenKlik(e) {
+  if (tekenGesloten) return;
+  const pt = getCanvasPunt(e);
+  if (tekenPunten.length >= 3) {
+    const f = tekenPunten[0];
+    if (Math.hypot(pt.x - f.x, pt.y - f.y) < 20) { sluitPolygoon(); return; }
+  }
+  tekenPunten.push(pt);
+  tekenCanvas();
+  bijwerkBtnAnalyseer();
+}
+
+function handleTekenHover(e) {
+  if (tekenGesloten) return;
+  hoverPunt = getCanvasPunt(e);
+  const canvas = document.getElementById('tekenCanvas');
+  if (tekenPunten.length >= 3) {
+    const f = tekenPunten[0];
+    canvas.style.cursor = Math.hypot(hoverPunt.x - f.x, hoverPunt.y - f.y) < 20 ? 'pointer' : 'crosshair';
+  }
+  tekenCanvas();
+}
+
+function getCanvasPunt(e) {
+  const canvas = document.getElementById('tekenCanvas');
+  const rect = canvas.getBoundingClientRect();
+  const cx = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
+  const cy = e.clientY ?? (e.touches ? e.touches[0].clientY : 0);
+  return { x: (cx - rect.left) * (640 / rect.width), y: (cy - rect.top) * (640 / rect.height) };
+}
+
+function sluitPolygoon() {
+  if (tekenPunten.length < 3) return;
+  tekenGesloten = true;
+  hoverPunt = null;
+  document.getElementById('tekenCanvas').style.cursor = 'default';
+  document.getElementById('canvasWrap').classList.add('gesloten');
+  tekenCanvas();
+  bijwerkBtnAnalyseer();
+}
+
+function tekenCanvas() {
+  const canvas = document.getElementById('tekenCanvas');
+  const ctx = canvas.getContext('2d');
+  ctx.clearRect(0, 0, 640, 640);
+  if (!tekenPunten.length && !hoverPunt) return;
+  const pts = tekenPunten;
+
+  if (tekenGesloten && pts.length >= 3) {
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    ctx.closePath();
+    ctx.fillStyle = 'rgba(249,115,22,0.22)';
+    ctx.fill();
+  }
+  if (pts.length >= 2) {
+    ctx.strokeStyle = 'rgba(249,115,22,0.9)';
+    ctx.lineWidth = 2; ctx.setLineDash([]);
+    ctx.beginPath();
+    ctx.moveTo(pts[0].x, pts[0].y);
+    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
+    if (tekenGesloten) ctx.closePath();
+    ctx.stroke();
+  }
+  if (!tekenGesloten && hoverPunt && pts.length) {
+    ctx.strokeStyle = 'rgba(249,115,22,0.4)';
+    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
+    ctx.beginPath();
+    ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
+    ctx.lineTo(hoverPunt.x, hoverPunt.y);
+    ctx.stroke(); ctx.setLineDash([]);
+  }
+  pts.forEach((p, i) => {
+    ctx.beginPath(); ctx.arc(p.x, p.y, i === 0 ? 7 : 4, 0, Math.PI * 2);
+    ctx.fillStyle = i === 0 ? '#10B981' : '#F97316'; ctx.fill();
+    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  });
+  if (!tekenGesloten && hoverPunt) {
+    ctx.beginPath(); ctx.arc(hoverPunt.x, hoverPunt.y, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(249,115,22,0.55)'; ctx.fill();
+  }
+  if (tekenGesloten && pts.length >= 3) {
+    const m2 = berekenOppervlak();
+    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
+    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
+    const label = Math.round(m2) + ' m²';
+    ctx.font = 'bold 15px Segoe UI,sans-serif';
+    const w = ctx.measureText(label).width;
+    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath();
+    ctx.roundRect(cx - w/2 - 8, cy - 12, w + 16, 24, 6); ctx.fill();
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    ctx.fillText(label, cx, cy);
+  }
+}
+
+function berekenOppervlak() {
+  if (tekenPunten.length < 3) return 0;
+  let area = 0;
+  const n = tekenPunten.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    area += tekenPunten[i].x * tekenPunten[j].y;
+    area -= tekenPunten[j].x * tekenPunten[i].y;
+  }
+  return Math.abs(area) / 2 * mppHuidig * mppHuidig;
+}
+
+function bijwerkBtnAnalyseer() {
+  const m2 = berekenOppervlak();
+  const btn = document.getElementById('btnAnalyseer');
+  const badge = document.getElementById('oppBadge');
+  if (tekenGesloten && m2 > 0) {
+    btn.disabled = false;
+    btn.textContent = 'Analyseer dak (' + Math.round(m2) + ' m²)';
+    badge.innerHTML = 'Getekend oppervlak: <strong>' + Math.round(m2) + ' m²</strong>';
+  } else if (tekenPunten.length > 0) {
+    btn.disabled = true;
+    btn.textContent = tekenPunten.length + ' punten — klik op startpunt om te sluiten';
+    badge.innerHTML = tekenPunten.length + ' punt' + (tekenPunten.length !== 1 ? 'en' : '') + ' geplaatst &mdash; klik op het groene punt om te sluiten';
+  } else {
+    btn.disabled = true;
+    btn.textContent = 'Analyseer dak';
+    badge.innerHTML = 'Teken een omlijning om het dakoppervlak te berekenen';
+  }
+}
+
+function resetPolygoon() {
+  tekenPunten = []; tekenGesloten = false; hoverPunt = null;
+  document.getElementById('tekenCanvas').style.cursor = 'crosshair';
+  document.getElementById('canvasWrap').classList.remove('gesloten');
+  tekenCanvas(); bijwerkBtnAnalyseer();
+}
+
+function slaPolygoonOver() {
+  voerAnalyseUit({ adres: locatieData?.formatted_address || document.getElementById('adresInput').value.trim(), gebouwType: gekozenType });
+}
+
+async function voerAnalyseMetPolygoon() {
+  const m2 = berekenOppervlak();
+  voerAnalyseUit({
+    adres: locatieData?.formatted_address || document.getElementById('adresInput').value.trim(),
+    gebouwType: gekozenType,
+    handmatigOppervlak: m2 > 5 ? Math.round(m2) : undefined
+  });
 }
 
 async function startDemo() {
@@ -353,10 +611,12 @@ async function voerAnalyseUit(params) {
       data = await r.json();
     } else {
       await wacht(600); stapActief(2);
+      const body = { adres: params.adres, gebouwType: params.gebouwType };
+      if (params.handmatigOppervlak) body.handmatigOppervlak = params.handmatigOppervlak;
       const r = await fetch('/analyse', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ adres: params.adres, gebouwType: params.gebouwType })
+        body: JSON.stringify(body)
       });
       data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Analyse mislukt');
@@ -622,6 +882,7 @@ function buildSubsidies(b, type) {
 // Hulpfuncties
 function toonLaden() {
   document.getElementById('startScherm').style.display = 'none';
+  document.getElementById('tekenScherm').style.display = 'none';
   document.getElementById('loading').style.display = 'block';
   document.getElementById('resultaten').style.display = 'none';
   ['step1','step2','step3','step4'].forEach(id => {
@@ -638,8 +899,10 @@ function stapActief(n) {
 }
 function nieuweAnalyse() {
   document.getElementById('resultaten').style.display = 'none';
+  document.getElementById('tekenScherm').style.display = 'none';
   document.getElementById('startScherm').style.display = 'block';
   document.getElementById('adresInput').value = '';
+  locatieData = null; tekenPunten = []; tekenGesloten = false;
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function wacht(ms) { return new Promise(r => setTimeout(r, ms)); }
