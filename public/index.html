@@ -1,0 +1,670 @@
+<!DOCTYPE html>
+<html lang="nl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Solar Dak Scanner — Gratis Dak­analyse</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --oranje: #F97316;
+  --donker: #0F172A;
+  --midden: #1E293B;
+  --groen:  #10B981;
+  --blauw:  #3B82F6;
+  --grijs:  #64748B;
+  --licht:  #F1F5F9;
+  --wit:    #ffffff;
+}
+body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker); color: var(--wit); min-height: 100vh; }
+
+/* ── HERO ── */
+.hero { padding: 60px 20px 40px; text-align: center; background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); position: relative; overflow: hidden; }
+.hero::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 80% 60% at 50% 0%, rgba(249,115,22,.12), transparent); pointer-events: none; }
+.badge { display: inline-block; background: rgba(249,115,22,.15); border: 1px solid rgba(249,115,22,.35); color: var(--oranje); font-size: 11px; font-weight: 700; letter-spacing: 2px; padding: 5px 14px; border-radius: 99px; margin-bottom: 20px; text-transform: uppercase; }
+.hero h1 { font-size: clamp(28px, 5vw, 52px); font-weight: 800; line-height: 1.15; margin-bottom: 16px; }
+.hero h1 span { color: var(--oranje); }
+.hero p { font-size: 17px; color: #94A3B8; max-width: 560px; margin: 0 auto 36px; line-height: 1.6; }
+
+/* ── FORMULIER ── */
+.form-card { background: #1E293B; border: 1px solid #334155; border-radius: 16px; padding: 32px; max-width: 640px; margin: 0 auto; }
+.form-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; margin-bottom: 14px; }
+.form-row input { width: 100%; background: #0F172A; border: 1.5px solid #334155; border-radius: 10px; padding: 14px 18px; font-size: 15px; color: var(--wit); outline: none; transition: border-color .2s; }
+.form-row input:focus { border-color: var(--oranje); }
+.form-row input::placeholder { color: #475569; }
+.type-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin-bottom: 20px; }
+.type-btn { background: #0F172A; border: 1.5px solid #334155; border-radius: 8px; padding: 10px 6px; text-align: center; cursor: pointer; transition: all .2s; font-size: 11px; color: #94A3B8; }
+.type-btn:hover, .type-btn.active { border-color: var(--oranje); background: rgba(249,115,22,.1); color: var(--wit); }
+.type-btn .icon { font-size: 20px; display: block; margin-bottom: 4px; }
+.btn-scan { width: 100%; background: var(--oranje); border: none; border-radius: 10px; padding: 15px; font-size: 16px; font-weight: 700; color: white; cursor: pointer; transition: all .2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+.btn-scan:hover { background: #EA6A0A; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(249,115,22,.35); }
+.btn-scan:disabled { opacity: .5; cursor: not-allowed; transform: none; box-shadow: none; }
+
+/* ── LADEN ── */
+#loading { display: none; text-align: center; padding: 60px 20px; }
+.scan-ring { width: 80px; height: 80px; border: 4px solid #334155; border-top-color: var(--oranje); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 20px; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.scan-steps { max-width: 280px; margin: 0 auto; text-align: left; }
+.scan-step { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14px; color: #64748B; transition: color .3s; }
+.scan-step.active { color: var(--oranje); font-weight: 600; }
+.scan-step.done { color: var(--groen); }
+.scan-step::before { content: '○'; font-size: 16px; }
+.scan-step.active::before { content: '◉'; }
+.scan-step.done::before { content: '✓'; }
+
+/* ── RESULTATEN ── */
+#resultaten { display: none; max-width: 1100px; margin: 0 auto; padding: 40px 20px 60px; }
+.res-header { text-align: center; margin-bottom: 32px; }
+.res-header h2 { font-size: 26px; font-weight: 800; margin-bottom: 6px; }
+.res-header .adres-tag { display: inline-block; background: rgba(249,115,22,.15); border: 1px solid rgba(249,115,22,.3); color: var(--oranje); padding: 5px 14px; border-radius: 6px; font-size: 13px; }
+
+/* Statistieken */
+.stats-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 12px; margin-bottom: 28px; }
+@media(max-width:900px) { .stats-grid { grid-template-columns: repeat(3,1fr); } }
+@media(max-width:520px) { .stats-grid { grid-template-columns: repeat(2,1fr); } }
+.stat-card { background: #1E293B; border: 1px solid #334155; border-radius: 12px; padding: 18px 12px; text-align: center; position: relative; overflow: hidden; }
+.stat-card::before { content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px; }
+.stat-card.oranje::before { background: var(--oranje); }
+.stat-card.groen::before  { background: var(--groen); }
+.stat-card.blauw::before  { background: var(--blauw); }
+.stat-card.grijs::before  { background: #475569; }
+.stat-val { font-size: 26px; font-weight: 800; line-height: 1; margin-bottom: 4px; }
+.stat-unit { font-size: 11px; color: var(--grijs); margin-bottom: 6px; }
+.stat-label { font-size: 10px; color: #94A3B8; text-transform: uppercase; letter-spacing: 1px; font-weight: 600; }
+
+/* Hoofd layout */
+.main-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+@media(max-width:760px) { .main-cols { grid-template-columns: 1fr; } }
+
+.card { background: #1E293B; border: 1px solid #334155; border-radius: 14px; overflow: hidden; }
+.card-header { padding: 16px 20px; border-bottom: 1px solid #334155; display: flex; align-items: center; justify-content: space-between; }
+.card-header h3 { font-size: 14px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+.card-body { padding: 20px; }
+
+/* Kaart met panel overlay */
+.roof-wrapper { position: relative; width: 100%; aspect-ratio: 1; background: #0F172A; border-radius: 0; overflow: hidden; }
+.roof-wrapper img, .roof-wrapper canvas { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+#dakCanvas { pointer-events: none; }
+.demo-dak { width: 100%; aspect-ratio: 1; background: linear-gradient(135deg, #1E293B, #0F172A); display: flex; align-items: center; justify-content: center; }
+.demo-svg { opacity: .6; }
+.panel-toggle { background: rgba(249,115,22,.2); border: 1px solid rgba(249,115,22,.4); border-radius: 6px; padding: 5px 10px; font-size: 11px; color: var(--oranje); cursor: pointer; font-weight: 600; }
+.panel-toggle:hover { background: rgba(249,115,22,.35); }
+
+/* Dak info */
+.dak-row { display: flex; justify-content: space-between; align-items: center; padding: 9px 0; border-bottom: 1px solid #1E293B; font-size: 13.5px; }
+.dak-row:last-child { border-bottom: none; }
+.dak-row .label { color: var(--grijs); }
+.dak-row .val { font-weight: 600; }
+.score-bar { display: flex; align-items: center; gap: 8px; }
+.score-bar .bar { flex: 1; height: 6px; background: #334155; border-radius: 3px; overflow: hidden; }
+.score-bar .fill { height: 100%; background: var(--groen); border-radius: 3px; transition: width 1s ease; }
+.tag { display: inline-block; background: rgba(16,185,129,.12); border: 1px solid rgba(16,185,129,.25); color: var(--groen); font-size: 11px; padding: 2px 8px; border-radius: 4px; font-weight: 600; }
+.tag.oranje { background: rgba(249,115,22,.12); border-color: rgba(249,115,22,.25); color: var(--oranje); }
+
+/* Financiën */
+.fin-rij { display: flex; justify-content: space-between; padding: 9px 0; border-bottom: 1px solid #1E293B; font-size: 13.5px; }
+.fin-rij:last-child { border-bottom: none; }
+.fin-rij .label { color: var(--grijs); }
+.fin-rij .val { font-weight: 700; }
+.fin-rij .val.groen { color: var(--groen); }
+.fin-rij .val.oranje { color: var(--oranje); }
+
+/* Grafiek */
+.grafiek-wrap { height: 200px; display: flex; align-items: flex-end; gap: 2px; padding: 0 4px; }
+.grafiek-staaf { flex: 1; border-radius: 3px 3px 0 0; transition: height 1s ease; min-height: 2px; cursor: pointer; position: relative; }
+.grafiek-staaf:hover::after { content: attr(data-tip); position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); background: #0F172A; border: 1px solid #334155; padding: 4px 8px; border-radius: 6px; font-size: 11px; white-space: nowrap; pointer-events: none; }
+.grafiek-as { display: flex; justify-content: space-between; font-size: 10px; color: var(--grijs); padding: 0 4px; margin-top: 4px; }
+.breakeven-lijn { position: relative; }
+
+/* Subsidies */
+.subsidie-item { display: flex; gap: 10px; padding: 10px 0; border-bottom: 1px solid #1E293B; font-size: 13px; }
+.subsidie-item:last-child { border-bottom: none; }
+.subsidie-icon { font-size: 18px; flex-shrink: 0; }
+
+/* CO2 / Milieu */
+.milieu-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.milieu-item { text-align: center; background: rgba(16,185,129,.06); border: 1px solid rgba(16,185,129,.2); border-radius: 10px; padding: 16px 8px; }
+.milieu-val { font-size: 22px; font-weight: 800; color: var(--groen); }
+.milieu-label { font-size: 11px; color: #94A3B8; margin-top: 4px; }
+
+/* PDF knop */
+.pdf-sectie { display: flex; gap: 14px; margin-top: 20px; }
+.btn-pdf { flex: 1; background: var(--groen); border: none; border-radius: 10px; padding: 14px; font-size: 15px; font-weight: 700; color: white; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px; transition: all .2s; text-decoration: none; }
+.btn-pdf:hover { background: #059669; transform: translateY(-1px); box-shadow: 0 8px 24px rgba(16,185,129,.3); }
+.btn-pdf.disabled { opacity: .5; cursor: default; pointer-events: none; }
+.btn-nieuw { background: transparent; border: 1.5px solid #475569; border-radius: 10px; padding: 14px 24px; font-size: 14px; font-weight: 600; color: #94A3B8; cursor: pointer; transition: all .2s; }
+.btn-nieuw:hover { border-color: var(--oranje); color: var(--oranje); }
+
+/* Demo banner */
+.demo-banner { background: rgba(249,115,22,.1); border: 1px solid rgba(249,115,22,.3); border-radius: 10px; padding: 12px 18px; margin-bottom: 20px; font-size: 13px; color: var(--oranje); display: flex; align-items: center; gap: 8px; }
+
+/* Counter animatie */
+.counter { display: inline-block; }
+
+/* Responsive */
+@media(max-width: 640px) { .form-row { grid-template-columns: 1fr; } .type-grid { grid-template-columns: repeat(3,1fr); } }
+</style>
+</head>
+<body>
+
+<!-- HERO & FORMULIER -->
+<div id="startScherm">
+  <div class="hero">
+    <div class="badge">AI-Powered Dakanalyse</div>
+    <h1>Ontdek het zonne­potentieel<br>van <span>elk dak</span></h1>
+    <p>Voer een adres in — onze AI analyseert het dak via satelliet en berekent in seconden uw volledige besparing, rendement en terugverdientijd.</p>
+  </div>
+
+  <div style="max-width:640px;margin:0 auto;padding:0 20px 60px">
+    <div class="form-card">
+      <p style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:16px">Gebouwtype</p>
+      <div class="type-grid">
+        <div class="type-btn active" data-type="gym" onclick="selectType(this)"><span class="icon">🏋️</span>Gymzaal</div>
+        <div class="type-btn" data-type="magazijn" onclick="selectType(this)"><span class="icon">🏭</span>Magazijn</div>
+        <div class="type-btn" data-type="bedrijf" onclick="selectType(this)"><span class="icon">🏢</span>Kantoor</div>
+        <div class="type-btn" data-type="school" onclick="selectType(this)"><span class="icon">🏫</span>School</div>
+        <div class="type-btn" data-type="woning" onclick="selectType(this)"><span class="icon">🏠</span>Woning</div>
+      </div>
+      <p style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:12px">Adres</p>
+      <div class="form-row">
+        <input type="text" id="adresInput" placeholder="bijv. Sportlaan 1, Amsterdam" autocomplete="off"
+          onkeydown="if(event.key==='Enter') startScan()">
+        <button class="btn-scan" onclick="startScan()" style="width:auto;padding:14px 24px">
+          <span>Scan</span> <span>🛰️</span>
+        </button>
+      </div>
+      <button class="btn-scan" onclick="startDemo()" style="background:#1E293B;border:1.5px solid #334155;color:#94A3B8;margin-top:4px">
+        Demo bekijken — geen API-sleutel nodig
+      </button>
+    </div>
+
+    <!-- Sociale proof -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:16px;margin-top:28px;text-align:center">
+      <div><div style="font-size:24px;font-weight:800;color:var(--oranje)">< 30s</div><div style="font-size:12px;color:#64748B">Analyse tijd</div></div>
+      <div><div style="font-size:24px;font-weight:800;color:var(--groen)">AI</div><div style="font-size:12px;color:#64748B">Claude Vision</div></div>
+      <div><div style="font-size:24px;font-weight:800;color:var(--blauw)">25jr</div><div style="font-size:12px;color:#64748B">Projectie</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- LADEN -->
+<div id="loading" style="max-width:640px;margin:0 auto;padding:80px 20px">
+  <div class="scan-ring"></div>
+  <p style="font-size:18px;font-weight:700;margin-bottom:8px">Dak wordt gescand...</p>
+  <p style="color:#64748B;font-size:14px;margin-bottom:28px">Even geduld — dit duurt 10–20 seconden</p>
+  <div class="scan-steps">
+    <div class="scan-step active" id="step1">Satellietfoto ophalen</div>
+    <div class="scan-step" id="step2">Dak analyseren met AI</div>
+    <div class="scan-step" id="step3">Financieel model berekenen</div>
+    <div class="scan-step" id="step4">Rapport genereren</div>
+  </div>
+</div>
+
+<!-- RESULTATEN -->
+<div id="resultaten">
+  <div class="res-header">
+    <h2>Uw dakanalyse is klaar</h2>
+    <div class="adres-tag" id="resAdres"></div>
+  </div>
+
+  <div id="demoBanner" class="demo-banner" style="display:none">
+    ℹ️ <strong>Demo-modus</strong> — Vul Google Maps API key + Anthropic API key in voor echte adressen.
+    Alle berekeningen zijn realistisch gegenereerd.
+  </div>
+
+  <!-- Statistieken -->
+  <div class="stats-grid">
+    <div class="stat-card blauw"><div class="stat-val counter" id="sPanelen">—</div><div class="stat-unit">stuks</div><div class="stat-label">Panelen</div></div>
+    <div class="stat-card blauw"><div class="stat-val counter" id="sKwp">—</div><div class="stat-unit">kWp</div><div class="stat-label">Systeem</div></div>
+    <div class="stat-card groen"><div class="stat-val counter" id="sKwh">—</div><div class="stat-unit">kWh/jaar</div><div class="stat-label">Productie</div></div>
+    <div class="stat-card oranje"><div class="stat-val counter" id="sBesparing">—</div><div class="stat-unit">€/jaar</div><div class="stat-label">Besparing</div></div>
+    <div class="stat-card grijs"><div class="stat-val counter" id="sInvestering">—</div><div class="stat-unit">investering</div><div class="stat-label">Bruto</div></div>
+    <div class="stat-card groen"><div class="stat-val counter" id="sTerugverdien">—</div><div class="stat-unit">jaar</div><div class="stat-label">Terugverdien</div></div>
+  </div>
+
+  <!-- Dak + Financiën -->
+  <div class="main-cols">
+    <!-- Dakvisualisatie -->
+    <div class="card">
+      <div class="card-header">
+        <h3>Dakvisualisatie</h3>
+        <button class="panel-toggle" id="panelToggle" onclick="togglePanelen()">Panelen aan</button>
+      </div>
+      <div class="card-body" style="padding:0">
+        <div class="roof-wrapper" id="roofWrapper">
+          <!-- Satellietfoto of demo SVG -->
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="dak-row"><span class="label">Dakoppervlak</span><span class="val" id="dOppervlak">—</span></div>
+        <div class="dak-row"><span class="label">Bruikbaar</span><span class="val" id="dBruikbaar">—</span></div>
+        <div class="dak-row"><span class="label">Type</span><span class="val" id="dType">—</span></div>
+        <div class="dak-row"><span class="label">Oriëntatie</span><span class="val" id="dOrientatie">—</span></div>
+        <div class="dak-row">
+          <span class="label">Geschiktheid</span>
+          <span class="val">
+            <div class="score-bar">
+              <div class="bar"><div class="fill" id="dScoreFill" style="width:0%"></div></div>
+              <span id="dScore">—</span>
+            </div>
+          </span>
+        </div>
+        <div class="dak-row" id="dObstakelsRij" style="display:none">
+          <span class="label">Obstakels</span>
+          <span class="val" id="dObstakels" style="text-align:right;font-size:12px;max-width:55%">—</span>
+        </div>
+        <div style="margin-top:10px;padding:10px;background:#0F172A;border-radius:8px;font-size:12px;color:#94A3B8;font-style:italic" id="dOpmerking"></div>
+      </div>
+    </div>
+
+    <!-- Financieel -->
+    <div class="card">
+      <div class="card-header"><h3>Financieel overzicht</h3></div>
+      <div class="card-body">
+        <div class="fin-rij"><span class="label">Bruto investering</span><span class="val" id="fInvestering">—</span></div>
+        <div class="fin-rij" id="fBtwRij" style="display:none"><span class="label">BTW-teruggaaf</span><span class="val oranje" id="fBtw">—</span></div>
+        <div class="fin-rij" id="fEiaRij" style="display:none"><span class="label">EIA belastingvoordeel</span><span class="val oranje" id="fEia">—</span></div>
+        <div class="fin-rij"><span class="label">Jaarlijkse besparing</span><span class="val groen" id="fBesparing">—</span></div>
+        <div class="fin-rij"><span class="label">Maandelijkse besparing</span><span class="val groen" id="fMaand">—</span></div>
+        <div class="fin-rij"><span class="label">Terugverdientijd</span><span class="val" id="fTerugverdien">—</span></div>
+        <div class="fin-rij"><span class="label">Dekking eigen verbruik</span><span class="val" id="fDekking">—</span></div>
+        <div class="fin-rij"><span class="label">SDE++ eligible</span><span class="val" id="fSde">—</span></div>
+        <div class="fin-rij" style="padding-top:12px;border-top:2px solid #334155;margin-top:4px">
+          <span class="label" style="color:var(--wit);font-weight:700">Totaalwinst 25 jaar</span>
+          <span class="val groen" style="font-size:18px" id="fTotaal">—</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Grafiek + Subsidies -->
+  <div class="main-cols" style="margin-bottom:20px">
+    <!-- Grafiek -->
+    <div class="card">
+      <div class="card-header"><h3>25-jaar besparing (cumulatief)</h3></div>
+      <div class="card-body">
+        <div class="grafiek-wrap" id="grafiek"></div>
+        <div class="grafiek-as"><span>Jaar 1</span><span>Jaar 10</span><span>Jaar 25</span></div>
+        <div style="display:flex;gap:16px;margin-top:12px;font-size:12px">
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:var(--blauw);border-radius:2px;display:inline-block"></span> Voor terugverdien</span>
+          <span style="display:flex;align-items:center;gap:5px"><span style="width:12px;height:12px;background:var(--groen);border-radius:2px;display:inline-block"></span> Pure winst</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Subsidies -->
+    <div class="card">
+      <div class="card-header"><h3>Subsidies &amp; regelingen</h3></div>
+      <div class="card-body" id="subsidieContent"></div>
+    </div>
+  </div>
+
+  <!-- Milieu -->
+  <div class="card" style="margin-bottom:20px">
+    <div class="card-header"><h3>Milieu-impact per jaar</h3></div>
+    <div class="card-body">
+      <div class="milieu-grid">
+        <div class="milieu-item"><div class="milieu-val" id="mCo2">—</div><div class="milieu-label">kg CO₂ bespaard/jaar</div></div>
+        <div class="milieu-item"><div class="milieu-val" id="mBomen">—</div><div class="milieu-label">bomen equivalent/jaar</div></div>
+        <div class="milieu-item"><div class="milieu-val" id="mKwh">—</div><div class="milieu-label">kWh schone energie/jaar</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PDF & Acties -->
+  <div class="pdf-sectie">
+    <a id="pdfLink" href="#" class="btn-pdf disabled" download>
+      📄 Download volledig rapport (PDF)
+    </a>
+    <button class="btn-nieuw" onclick="nieuweAnalyse()">↩ Nieuw adres</button>
+  </div>
+</div>
+
+<script>
+let huidigeData = null;
+let panelActief = true;
+let gekozenType = 'gym';
+
+function selectType(el) {
+  document.querySelectorAll('.type-btn').forEach(b => b.classList.remove('active'));
+  el.classList.add('active');
+  gekozenType = el.dataset.type;
+}
+
+async function startScan() {
+  const adres = document.getElementById('adresInput').value.trim();
+  if (!adres) { document.getElementById('adresInput').focus(); return; }
+  await voerAnalyseUit({ adres, gebouwType: gekozenType });
+}
+
+async function startDemo() {
+  await voerAnalyseUit({ demo: true, gebouwType: gekozenType });
+}
+
+async function voerAnalyseUit(params) {
+  toonLaden();
+  stapActief(1);
+
+  try {
+    let data;
+    if (params.demo) {
+      stapActief(2);
+      const r = await fetch(`/analyse/demo?type=${params.gebouwType}`);
+      data = await r.json();
+    } else {
+      await wacht(600); stapActief(2);
+      const r = await fetch('/analyse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adres: params.adres, gebouwType: params.gebouwType })
+      });
+      data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Analyse mislukt');
+    }
+
+    stapActief(3); await wacht(400);
+    stapActief(4); await wacht(600);
+
+    huidigeData = data;
+    toonResultaten(data);
+  } catch (err) {
+    verbergLaden();
+    alert('Fout: ' + err.message);
+  }
+}
+
+function toonResultaten(data) {
+  const { locatie, kaartUrl, dakAnalyse: d, berekening: b, pdfUrl, demoModus } = data;
+
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('resultaten').style.display = 'block';
+  document.getElementById('startScherm').style.display = 'none';
+
+  document.getElementById('resAdres').textContent = locatie;
+  document.getElementById('demoBanner').style.display = demoModus ? 'flex' : 'none';
+
+  // Statistieken (animatie)
+  animeerTeller('sPanelen',   b.aantalPanelen,   0);
+  animeerTeller('sKwp',       b.systeemKwp,      1);
+  animeerTeller('sKwh',       b.jaarproductieKwh, 0, true);
+  animeerTeller('sBesparing', b.jaarbesparingEuro, 0, true, '€');
+  animeerTeller('sInvestering', b.investeringEuro, 0, true, '€');
+  animeerTeller('sTerugverdien', b.terugverdientijdJr, 1);
+
+  // Dakinfo
+  document.getElementById('dOppervlak').textContent  = d.dakoppervlak_m2 + ' m²';
+  document.getElementById('dBruikbaar').textContent  = d.bruikbaar_oppervlak_m2 + ' m²';
+  document.getElementById('dType').textContent       = capitalize(d.daktype);
+  document.getElementById('dOrientatie').textContent = capitalize(d.orientatie);
+  document.getElementById('dScore').textContent      = d.geschiktheid_score + '/10';
+  document.getElementById('dOpmerking').textContent  = d.opmerkingen || '';
+  setTimeout(() => {
+    document.getElementById('dScoreFill').style.width = (d.geschiktheid_score * 10) + '%';
+  }, 300);
+  if (d.obstakels?.length) {
+    document.getElementById('dObstakelsRij').style.display = 'flex';
+    document.getElementById('dObstakels').textContent = d.obstakels.slice(0, 3).join(', ');
+  }
+
+  // Dak visualisatie
+  const wrapper = document.getElementById('roofWrapper');
+  wrapper.innerHTML = '';
+  if (kaartUrl) {
+    const img = document.createElement('img');
+    img.src    = kaartUrl;
+    img.alt    = 'Satellietfoto dak';
+    img.id     = 'dakImg';
+    img.onload = () => tekenPanelen(d.panel_zones, img);
+    wrapper.appendChild(img);
+    const canvas = document.createElement('canvas');
+    canvas.id = 'dakCanvas';
+    wrapper.appendChild(canvas);
+  } else {
+    wrapper.innerHTML = buildDemoSvg(d);
+  }
+
+  // Financieel
+  document.getElementById('fInvestering').textContent  = '€' + fmt(b.investeringEuro);
+  document.getElementById('fBesparing').textContent    = '€' + fmt(b.jaarbesparingEuro);
+  document.getElementById('fMaand').textContent        = '€' + fmt(b.maandBesparing);
+  document.getElementById('fTerugverdien').textContent = b.terugverdientijdJr + ' jaar';
+  document.getElementById('fDekking').textContent      = b.dekkingPct + '%';
+  document.getElementById('fTotaal').textContent       = '€' + fmt(b.totaalBesparing25jr);
+  document.getElementById('fSde').innerHTML = b.sdeEligible
+    ? '<span class="tag">Ja ✓</span>' : '<span class="tag oranje">Nee (< 15 kWp)</span>';
+  if (b.btwTeruggaafEuro > 0) {
+    document.getElementById('fBtwRij').style.display = 'flex';
+    document.getElementById('fBtw').textContent = '−€' + fmt(b.btwTeruggaafEuro);
+  }
+  if (b.eiaKortingEuro > 0) {
+    document.getElementById('fEiaRij').style.display = 'flex';
+    document.getElementById('fEia').textContent = '−€' + fmt(b.eiaKortingEuro);
+  }
+
+  // Grafiek
+  bouwGrafiek(b.projectie25jaar, b.investeringEuro);
+
+  // Subsidies
+  document.getElementById('subsidieContent').innerHTML = buildSubsidies(b, gekozenType);
+
+  // Milieu
+  document.getElementById('mCo2').textContent  = fmt(b.co2ReductieKgJaar);
+  document.getElementById('mBomen').textContent = fmt(b.co2BomenEquivalent);
+  document.getElementById('mKwh').textContent   = fmt(b.jaarproductieKwh);
+
+  // PDF
+  if (pdfUrl) {
+    const pdfBtn = document.getElementById('pdfLink');
+    pdfBtn.href = pdfUrl;
+    pdfBtn.classList.remove('disabled');
+  }
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function tekenPanelen(zones, img) {
+  const canvas = document.getElementById('dakCanvas');
+  if (!canvas) return;
+  canvas.width  = img.naturalWidth  || img.width;
+  canvas.height = img.naturalHeight || img.height;
+  const ctx = canvas.getContext('2d');
+  _tekenZones(ctx, zones, canvas.width, canvas.height);
+}
+
+function _tekenZones(ctx, zones, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  if (!panelActief || !zones?.length) return;
+  zones.forEach(z => {
+    const zx = (z.x_pct / 100) * w;
+    const zy = (z.y_pct / 100) * h;
+    const zw = (z.breedte_pct / 100) * w;
+    const zh = (z.hoogte_pct / 100) * h;
+    const pw = 22, ph = 13, pg = 2;
+    for (let py = zy + pg; py < zy + zh - ph; py += ph + pg) {
+      for (let px = zx + pg; px < zx + zw - pw; px += pw + pg) {
+        // Panel
+        ctx.fillStyle = 'rgba(29, 78, 216, 0.72)';
+        ctx.fillRect(px, py, pw, ph);
+        // Rand
+        ctx.strokeStyle = 'rgba(96, 165, 250, 0.9)';
+        ctx.lineWidth = 0.7;
+        ctx.strokeRect(px, py, pw, ph);
+        // Cel kruislijnen
+        ctx.strokeStyle = 'rgba(147, 197, 253, 0.5)';
+        ctx.lineWidth = 0.4;
+        ctx.beginPath();
+        ctx.moveTo(px + pw / 2, py);     ctx.lineTo(px + pw / 2, py + ph);
+        ctx.moveTo(px, py + ph / 2);     ctx.lineTo(px + pw, py + ph / 2);
+        ctx.stroke();
+        // Sheen
+        ctx.fillStyle = 'rgba(219, 234, 254, 0.18)';
+        ctx.fillRect(px + 1, py + 1, pw / 2 - 2, ph / 2 - 2);
+      }
+    }
+  });
+}
+
+function togglePanelen() {
+  panelActief = !panelActief;
+  document.getElementById('panelToggle').textContent = panelActief ? 'Panelen aan' : 'Panelen uit';
+  const canvas = document.getElementById('dakCanvas');
+  const img    = document.getElementById('dakImg');
+  if (canvas && img && huidigeData) {
+    const ctx = canvas.getContext('2d');
+    _tekenZones(ctx, huidigeData.dakAnalyse.panel_zones, canvas.width, canvas.height);
+  }
+  // ook demo SVG canvas
+  const demoCanvas = document.getElementById('demoCanvas');
+  if (demoCanvas && huidigeData) {
+    const ctx = demoCanvas.getContext('2d');
+    const parent = demoCanvas.parentElement;
+    ctx.clearRect(0, 0, demoCanvas.width, demoCanvas.height);
+    if (panelActief) _tekenZones(ctx, huidigeData.dakAnalyse.panel_zones, demoCanvas.width, demoCanvas.height);
+  }
+}
+
+function buildDemoSvg(d) {
+  const isPlat = d.daktype === 'plat';
+  const svg = isPlat ? `
+    <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;width:100%;height:100%;background:#1a2744">
+      <!-- Luchtfoto stijl plat dak -->
+      <rect x="40" y="40" width="320" height="320" fill="#2d3748" rx="4"/>
+      <rect x="50" y="50" width="300" height="300" fill="#374151" rx="2"/>
+      <rect x="65" y="65" width="270" height="270" fill="#4b5563" rx="2"/>
+      <!-- HVAC units -->
+      <rect x="80" y="80" width="40" height="30" fill="#6b7280" rx="2"/>
+      <rect x="84" y="84" width="32" height="22" fill="#9ca3af" rx="1"/>
+      <rect x="280" y="90" width="50" height="35" fill="#6b7280" rx="2"/>
+      <rect x="284" y="94" width="42" height="27" fill="#9ca3af" rx="1"/>
+      <!-- Ventilatiepijpen -->
+      <circle cx="200" cy="95" r="8" fill="#9ca3af"/>
+      <circle cx="200" cy="95" r="5" fill="#6b7280"/>
+      <circle cx="320" cy="280" r="6" fill="#9ca3af"/>
+      <!-- Dakrandlijn -->
+      <rect x="50" y="50" width="300" height="300" fill="none" stroke="#9ca3af" stroke-width="2"/>
+    </svg>` : `
+    <svg viewBox="0 0 400 400" xmlns="http://www.w3.org/2000/svg" style="position:absolute;inset:0;width:100%;height:100%;background:#1a2744">
+      <!-- Luchtfoto stijl hellend dak -->
+      <polygon points="200,30 370,180 370,370 30,370 30,180" fill="#374151"/>
+      <polygon points="200,30 370,180 200,180" fill="#4b5563"/>
+      <polygon points="200,30 30,180 200,180" fill="#2d3748"/>
+      <polygon points="30,180 370,180 370,370 30,370" fill="#4b5563"/>
+      <!-- Nokvorst -->
+      <line x1="200" y1="30" x2="200" y2="180" stroke="#9ca3af" stroke-width="3"/>
+      <line x1="30" y1="180" x2="370" y2="180" stroke="#9ca3af" stroke-width="2"/>
+      <!-- Schoorsteen -->
+      <rect x="240" y="80" width="20" height="30" fill="#6b7280"/>
+      <rect x="237" y="75" width="26" height="8" fill="#9ca3af"/>
+    </svg>`;
+
+  return `<div style="position:relative;width:100%;aspect-ratio:1">
+    ${svg}
+    <canvas id="demoCanvas" style="position:absolute;inset:0;width:100%;height:100%;pointer-events:none"></canvas>
+  </div>`;
+  // Teken panelen op demo SVG na render
+  setTimeout(() => {
+    const c = document.getElementById('demoCanvas');
+    if (c && huidigeData) {
+      c.width = 400; c.height = 400;
+      _tekenZones(c.getContext('2d'), huidigeData.dakAnalyse.panel_zones, 400, 400);
+    }
+  }, 100);
+}
+
+// Kleine workaround: return HTML string en schedule panel tekening
+(function patchBuildDemoSvg() {
+  const orig = buildDemoSvg;
+  window.buildDemoSvg = function(d) {
+    const html = orig(d);
+    setTimeout(() => {
+      const c = document.getElementById('demoCanvas');
+      if (c && huidigeData) {
+        c.width = 400; c.height = 400;
+        _tekenZones(c.getContext('2d'), huidigeData.dakAnalyse.panel_zones, 400, 400);
+      }
+    }, 150);
+    return html;
+  };
+})();
+
+function bouwGrafiek(projectie, investering) {
+  const container = document.getElementById('grafiek');
+  container.innerHTML = '';
+  const max = projectie[projectie.length - 1].cumulatief;
+
+  projectie.forEach(p => {
+    const div = document.createElement('div');
+    div.className = 'grafiek-staaf';
+    const hoogte = Math.max(2, Math.round((p.cumulatief / max) * 196));
+    const isWinst = p.cumulatief >= investering;
+    div.style.cssText = `height:0;background:${isWinst ? '#10B981' : '#3B82F6'};transition:height .8s ease ${p.jaar * 20}ms`;
+    div.setAttribute('data-tip', `Jaar ${p.jaar}: €${fmt(p.cumulatief)}`);
+    container.appendChild(div);
+    setTimeout(() => div.style.height = hoogte + 'px', 50);
+  });
+}
+
+function buildSubsidies(b, type) {
+  const items = [];
+  if (type === 'woning') items.push({ icon: '⚡', title: 'Salderingsregeling', tekst: 'Terugleveren tegen stroomtarief. Let op: wordt afgebouwd na 2027.' });
+  if (b.sdeEligible)     items.push({ icon: '💶', title: 'SDE++ Subsidie', tekst: `${b.systeemKwp} kWp — aanvraag via RVO. Jaarlijkse productiepremie.` });
+  if (b.btwTeruggaafEuro > 0) items.push({ icon: '🏦', title: 'BTW-teruggaaf', tekst: `€${fmt(b.btwTeruggaafEuro)} — aanvragen via Belastingdienst.` });
+  if (b.eiaKortingEuro > 0)   items.push({ icon: '📊', title: 'EIA Aftrek (45.5%)', tekst: `€${fmt(b.eiaKortingEuro)} belastingvoordeel — via jaarlijkse aangifte VPB.` });
+  items.push({ icon: '🌱', title: 'Postcoderoos', tekst: 'Energie-coöperaties leveren soms extra korting. Check lokale opties.' });
+  return items.map(i => `
+    <div class="subsidie-item">
+      <div class="subsidie-icon">${i.icon}</div>
+      <div><div style="font-weight:700;font-size:13px;margin-bottom:2px">${i.title}</div>
+      <div style="color:#94A3B8;font-size:12px">${i.tekst}</div></div>
+    </div>`).join('');
+}
+
+// Hulpfuncties
+function toonLaden() {
+  document.getElementById('startScherm').style.display = 'none';
+  document.getElementById('loading').style.display = 'block';
+  document.getElementById('resultaten').style.display = 'none';
+  ['step1','step2','step3','step4'].forEach(id => {
+    document.getElementById(id).className = 'scan-step';
+  });
+}
+function verbergLaden() {
+  document.getElementById('loading').style.display = 'none';
+  document.getElementById('startScherm').style.display = 'block';
+}
+function stapActief(n) {
+  for (let i = 1; i < n; i++) document.getElementById('step' + i).className = 'scan-step done';
+  document.getElementById('step' + n).className = 'scan-step active';
+}
+function nieuweAnalyse() {
+  document.getElementById('resultaten').style.display = 'none';
+  document.getElementById('startScherm').style.display = 'block';
+  document.getElementById('adresInput').value = '';
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+function wacht(ms) { return new Promise(r => setTimeout(r, ms)); }
+function fmt(n) { return Math.round(n).toLocaleString('nl-NL'); }
+function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—'; }
+
+function animeerTeller(id, eindWaarde, decimalen = 0, metDuizend = false, prefix = '') {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const eindTekst = prefix + (metDuizend ? fmt(eindWaarde) : eindWaarde.toFixed(decimalen));
+  // Zet eindwaarde direct als fallback
+  el.textContent = eindTekst;
+
+  const duur = 1200;
+  const start = performance.now();
+  let raf;
+  function stap(nu) {
+    const t = Math.min((nu - start) / duur, 1);
+    const val = eindWaarde * (t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t);
+    el.textContent = prefix + (metDuizend ? fmt(val) : val.toFixed(decimalen));
+    if (t < 1) { raf = requestAnimationFrame(stap); }
+    else { el.textContent = eindTekst; }
+  }
+  raf = requestAnimationFrame(stap);
+}
+</script>
+</body>
+</html>

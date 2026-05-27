@@ -1,0 +1,20 @@
+{
+  "name": "solar-dak-scanner",
+  "version": "1.0.0",
+  "description": "AI-powered solar roof analysis — satellite image + Claude vision → personalized financial report with panel rendering",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "nodemon server.js"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.30.0",
+    "axios": "^1.7.0",
+    "dotenv": "^16.4.0",
+    "express": "^4.19.0",
+    "pdfkit": "^0.15.0"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.0"
+  }
+}
