@@ -434,7 +434,7 @@ function toonTekenScherm(data) {
   }
 
   const canvas = document.getElementById('tekenCanvas');
-  canvas.width = 640; canvas.height = 640;
+  canvas.width = 1280; canvas.height = 1280;
   canvas.style.cursor = 'crosshair';
   document.getElementById('canvasWrap').classList.remove('gesloten');
 
@@ -476,7 +476,7 @@ function getCanvasPunt(e) {
   const rect = canvas.getBoundingClientRect();
   const cx = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
   const cy = e.clientY ?? (e.touches ? e.touches[0].clientY : 0);
-  return { x: (cx - rect.left) * (640 / rect.width), y: (cy - rect.top) * (640 / rect.height) };
+  return { x: (cx - rect.left) * (canvas.width / rect.width), y: (cy - rect.top) * (canvas.height / rect.height) };
 }
 
 function sluitPolygoon() {
@@ -492,7 +492,7 @@ function sluitPolygoon() {
 function tekenCanvas() {
   const canvas = document.getElementById('tekenCanvas');
   const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, 640, 640);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
   if (!tekenPunten.length && !hoverPunt) return;
   const pts = tekenPunten;
 

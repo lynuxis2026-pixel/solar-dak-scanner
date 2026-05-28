@@ -32,7 +32,7 @@ async function haalSatellietfoto(lat, lng) {
       zoom: 20,
       size: '640x640',
       maptype: 'satellite',
-      scale: 1,
+      scale: 2,
       key: API_KEY
     },
     responseType: 'arraybuffer'
@@ -43,7 +43,7 @@ async function haalSatellietfoto(lat, lng) {
 // Bouw publiek-toegankelijke URL voor frontend canvas rendering
 function bouwKaartUrl(lat, lng, zoom = 20, size = '640x640') {
   if (DEMO_MODE) return null;
-  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}&maptype=satellite&key=${API_KEY}`;
+  return `https://maps.googleapis.com/maps/api/staticmap?center=${lat},${lng}&zoom=${zoom}&size=${size}&maptype=satellite&scale=2&key=${API_KEY}`;
 }
 
 module.exports = { geocodeer, haalSatellietfoto, bouwKaartUrl, DEMO_MODE };

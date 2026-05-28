@@ -22,7 +22,7 @@ router.get('/locatie', async (req, res) => {
   try {
     const locatie = await maps.geocodeer(adres.trim());
     const kaartUrl = maps.bouwKaartUrl(locatie.lat, locatie.lng);
-    const metersPerPixel = 156543.03392 * Math.cos(locatie.lat * Math.PI / 180) / Math.pow(2, 20);
+    const metersPerPixel = 156543.03392 * Math.cos(locatie.lat * Math.PI / 180) / Math.pow(2, 20) / 2;
     res.json({
       lat: locatie.lat,
       lng: locatie.lng,
