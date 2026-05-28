@@ -162,6 +162,13 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
 .btn-analyseer:disabled { opacity: .4; cursor: not-allowed; transform: none; box-shadow: none; }
 .teken-hint { background: rgba(59,130,246,.08); border: 1px solid rgba(59,130,246,.2); border-radius: 8px; padding: 10px 14px; font-size: 12px; color: #93C5FD; margin-bottom: 14px; display: flex; gap: 8px; }
 
+/* Adres dropdown */
+.adres-wrap { position: relative; }
+.adres-dropdown { position: absolute; top: 100%; left: 0; right: 0; background: #1E293B; border: 1.5px solid #475569; border-top: none; border-radius: 0 0 10px 10px; z-index: 200; overflow: hidden; box-shadow: 0 8px 24px rgba(0,0,0,.4); }
+.adres-dd-item { padding: 11px 18px; font-size: 14px; cursor: pointer; color: #CBD5E1; transition: background .12s; border-bottom: 1px solid #334155; }
+.adres-dd-item:last-child { border-bottom: none; }
+.adres-dd-item:hover, .adres-dd-item.actief { background: rgba(249,115,22,.18); color: #fff; }
+
 /* Responsive */
 @media(max-width: 640px) { .form-row { grid-template-columns: 1fr; } .type-grid { grid-template-columns: repeat(3,1fr); } }
 </style>
@@ -188,8 +195,10 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
       </div>
       <p style="font-size:12px;color:#64748B;text-transform:uppercase;letter-spacing:1.5px;font-weight:700;margin-bottom:12px">Adres</p>
       <div class="form-row">
-        <input type="text" id="adresInput" placeholder="bijv. Kerkstraat 12, Amsterdam" autocomplete="off"
-          onkeydown="if(event.key==='Enter') zoekLocatie()">
+        <div class="adres-wrap">
+          <input type="text" id="adresInput" placeholder="bijv. Kerkstraat 12, Amsterdam" autocomplete="off">
+          <div id="adresDropdown" class="adres-dropdown" style="display:none"></div>
+        </div>
         <button class="btn-scan" onclick="zoekLocatie()" style="width:auto;padding:14px 24px">
           <span>Scan</span> <span>🛰️</span>
         </button>
@@ -845,6 +854,71 @@ function nieuweAnalyse() {
 function wacht(ms) { return new Promise(r => setTimeout(r, ms)); }
 function fmt(n) { return Math.round(n).toLocaleString('nl-NL'); }
 function capitalize(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : '—'; }
+
+// ── ADRES AUTOCOMPLETE (PDOK Locatieserver) ──
+let _ddTimer = null;
+
+(function initAutocomplete() {
+  const inp = document.getElementById('adresInput');
+
+  inp.addEventListener('input', () => {
+    clearTimeout(_ddTimer);
+    const q = inp.value.trim();
+    if (q.length < 3) { verbergDropdown(); return; }
+    _ddTimer = setTimeout(() => suggesteerAdressen(q), 220);
+  });
+
+  inp.addEventListener('keydown', e => {
+    const items = [...document.querySelectorAll('.adres-dd-item')];
+    const idx   = items.findIndex(i => i.classList.contains('actief'));
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      items.forEach(i => i.classList.remove('actief'));
+      items[(idx + 1) % items.length]?.classList.add('actief');
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      items.forEach(i => i.classList.remove('actief'));
+      items[(idx - 1 + items.length) % items.length]?.classList.add('actief');
+    } else if (e.key === 'Enter') {
+      const sel = document.querySelector('.adres-dd-item.actief');
+      if (sel) { e.preventDefault(); kiesAdres(sel.dataset.adres); }
+      else zoekLocatie();
+    } else if (e.key === 'Escape') {
+      verbergDropdown();
+    }
+  });
+
+  document.addEventListener('click', e => {
+    if (!e.target.closest('.adres-wrap')) verbergDropdown();
+  });
+})();
+
+async function suggesteerAdressen(q) {
+  try {
+    const r = await fetch(`https://api.pdok.nl/bzk/locatieserver/search/v3_1/suggest?q=${encodeURIComponent(q)}&fq=type:adres&rows=6`);
+    const data = await r.json();
+    toonDropdown(data.response?.docs || []);
+  } catch { verbergDropdown(); }
+}
+
+function toonDropdown(docs) {
+  const dd = document.getElementById('adresDropdown');
+  if (!docs.length) { verbergDropdown(); return; }
+  dd.innerHTML = docs.map(d =>
+    `<div class="adres-dd-item" data-adres="${d.weergavenaam.replace(/"/g,'&quot;')}" onclick="kiesAdres(this.dataset.adres)">${d.weergavenaam}</div>`
+  ).join('');
+  dd.style.display = 'block';
+}
+
+function verbergDropdown() {
+  document.getElementById('adresDropdown').style.display = 'none';
+}
+
+function kiesAdres(adres) {
+  document.getElementById('adresInput').value = adres;
+  verbergDropdown();
+  zoekLocatie();
+}
 
 function animeerTeller(id, eindWaarde, decimalen = 0, metDuizend = false, prefix = '') {
   const el = document.getElementById(id);
