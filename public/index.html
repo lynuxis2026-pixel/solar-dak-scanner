@@ -4,6 +4,8 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Solar Dak Scanner — Gratis Dak­analyse</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 :root {
@@ -375,11 +377,12 @@ let huidigeData = null;
 let panelActief = true;
 let gekozenType = 'woning';
 
-// Google Maps drawing state
-let mapsLoaded = false;
-let dakTekenMap = null;
-let drawingMgr = null;
+// Leaflet drawing state
+let leafletMap = null;
+let latlngPunten = [];
+let polylinePreview = null;
 let dakPolygon = null;
+let sluitMarker = null;
 let m2Getekend = 0;
 let locatieData = null;
 
@@ -414,84 +417,80 @@ function toonTekenScherm(data) {
   document.getElementById('tekenScherm').style.display = 'block';
   document.getElementById('tekenAdresLabel').textContent = data.formatted_address;
   locatieData = data;
-  m2Getekend = 0;
-  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
-  document.getElementById('dakTekenMap').classList.remove('getekend');
-
-  if (!data.kaartUrl) {
-    document.getElementById('tekenInstructie').textContent = 'Demo-modus: geen kaart beschikbaar. Klik op Overslaan voor automatische schatting.';
-    bijwerkBtnAnalyseer(0);
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    return;
-  }
-
-  document.getElementById('tekenInstructie').textContent = 'Zoom in op uw dak, teken de dakrand punt voor punt. Dubbelklik om de omlijning te sluiten.';
-
-  // Extraheer API key uit de kaartUrl (die al naar client gestuurd wordt)
-  const mapsKey = new URL(data.kaartUrl).searchParams.get('key');
-
-  if (!mapsLoaded) {
-    document.getElementById('tekenInstructie').textContent = 'Kaart laden…';
-    window._onMapsReady = () => { mapsLoaded = true; initDakTekenMap(data); };
-    const s = document.createElement('script');
-    s.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=drawing,geometry&callback=_onMapsReady`;
-    s.async = true; s.defer = true;
-    document.head.appendChild(s);
-  } else {
-    initDakTekenMap(data);
-  }
+  document.getElementById('tekenInstructie').textContent = 'Klik op het dak om punten te plaatsen — klik op het groene startpunt om de omlijning te sluiten';
+  initDakTekenMap(data);
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function initDakTekenMap(data) {
-  document.getElementById('tekenInstructie').textContent = 'Zoom in op uw dak, teken de dakrand punt voor punt. Dubbelklik om de omlijning te sluiten.';
   const mapDiv = document.getElementById('dakTekenMap');
-  mapDiv.innerHTML = '';
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+  latlngPunten = [];
+  if (dakPolygon) { dakPolygon = null; }
+  if (polylinePreview) { polylinePreview = null; }
+  if (sluitMarker) { sluitMarker = null; }
+  m2Getekend = 0;
+  document.getElementById('dakTekenMap').classList.remove('getekend');
 
-  dakTekenMap = new google.maps.Map(mapDiv, {
-    center: { lat: data.lat, lng: data.lng },
-    zoom: 20,
-    mapTypeId: 'satellite',
-    tilt: 0,
-    streetViewControl: false,
-    mapTypeControl: false,
-    fullscreenControl: true,
-    zoomControl: true,
-    gestureHandling: 'greedy',
-    mapId: 'solar_dak'
-  });
+  leafletMap = L.map(mapDiv, { center: [data.lat, data.lng], zoom: 20, zoomControl: true });
 
-  drawingMgr = new google.maps.drawing.DrawingManager({
-    drawingMode: google.maps.drawing.OverlayType.POLYGON,
-    drawingControl: false,
-    polygonOptions: {
-      fillColor: '#F97316',
-      fillOpacity: 0.22,
-      strokeColor: '#F97316',
-      strokeOpacity: 0.95,
-      strokeWeight: 2.5,
-      editable: true,
-      draggable: false
-    }
-  });
-  drawingMgr.setMap(dakTekenMap);
+  L.tileLayer('https://service.pdok.nl/hwh/luchtfotorgb/wmts/v1_0/Actueel_orthoHR/EPSG:3857/{z}/{x}/{y}.jpeg', {
+    attribution: '© <a href="https://www.pdok.nl">PDOK</a> Luchtfoto NL',
+    maxZoom: 22,
+    maxNativeZoom: 21,
+    tileSize: 256
+  }).addTo(leafletMap);
 
-  google.maps.event.addListener(drawingMgr, 'polygoncomplete', poly => {
-    dakPolygon = poly;
-    drawingMgr.setDrawingMode(null);
-    document.getElementById('dakTekenMap').classList.add('getekend');
-
-    const herbereken = () => {
-      m2Getekend = Math.round(google.maps.geometry.spherical.computeArea(dakPolygon.getPath()));
-      bijwerkBtnAnalyseer(m2Getekend);
-    };
-    herbereken();
-    ['set_at', 'insert_at', 'remove_at'].forEach(ev =>
-      dakPolygon.getPath().addListener(ev, herbereken)
-    );
-  });
-
+  leafletMap.on('click', onMapKlik);
   bijwerkBtnAnalyseer(0);
+}
+
+function onMapKlik(e) {
+  if (dakPolygon) return;
+  const pt = e.latlng;
+  latlngPunten.push(pt);
+
+  if (latlngPunten.length === 1) {
+    sluitMarker = L.circleMarker(pt, {
+      radius: 8, fillColor: '#10B981', color: '#ffffff', weight: 2, fillOpacity: 1, zIndexOffset: 100
+    }).addTo(leafletMap);
+    sluitMarker.on('click', function(ev) { L.DomEvent.stopPropagation(ev); sluitPolygoon(); });
+  }
+
+  if (polylinePreview) polylinePreview.remove();
+  if (latlngPunten.length > 1) {
+    polylinePreview = L.polyline(latlngPunten, { color: '#F97316', weight: 2.5, opacity: 0.9 }).addTo(leafletMap);
+  }
+}
+
+function sluitPolygoon() {
+  if (latlngPunten.length < 3) return;
+  if (polylinePreview) { polylinePreview.remove(); polylinePreview = null; }
+  if (sluitMarker) { sluitMarker.remove(); sluitMarker = null; }
+
+  dakPolygon = L.polygon(latlngPunten, {
+    fillColor: '#F97316', fillOpacity: 0.22,
+    color: '#F97316', weight: 2.5, opacity: 0.95
+  }).addTo(leafletMap);
+
+  document.getElementById('dakTekenMap').classList.add('getekend');
+  m2Getekend = Math.round(berekenGeodesischOppervlak(latlngPunten));
+  bijwerkBtnAnalyseer(m2Getekend);
+}
+
+function berekenGeodesischOppervlak(punten) {
+  if (punten.length < 3) return 0;
+  const R = 6371000;
+  let area = 0;
+  const n = punten.length;
+  for (let i = 0; i < n; i++) {
+    const j = (i + 1) % n;
+    const lat1 = punten[i].lat * Math.PI / 180;
+    const lat2 = punten[j].lat * Math.PI / 180;
+    const dLng = (punten[j].lng - punten[i].lng) * Math.PI / 180;
+    area += dLng * (2 + Math.sin(lat1) + Math.sin(lat2));
+  }
+  return Math.abs(area * R * R / 2);
 }
 
 function bijwerkBtnAnalyseer(m2) {
@@ -509,10 +508,12 @@ function bijwerkBtnAnalyseer(m2) {
 }
 
 function resetPolygoon() {
-  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
+  if (dakPolygon) { dakPolygon.remove(); dakPolygon = null; }
+  if (polylinePreview) { polylinePreview.remove(); polylinePreview = null; }
+  if (sluitMarker) { sluitMarker.remove(); sluitMarker = null; }
+  latlngPunten = [];
   m2Getekend = 0;
   document.getElementById('dakTekenMap').classList.remove('getekend');
-  if (drawingMgr) drawingMgr.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
   bijwerkBtnAnalyseer(0);
 }
 
@@ -836,7 +837,9 @@ function nieuweAnalyse() {
   document.getElementById('startScherm').style.display = 'block';
   document.getElementById('adresInput').value = '';
   locatieData = null; m2Getekend = 0;
-  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
+  if (dakPolygon) { dakPolygon.remove(); dakPolygon = null; }
+  if (leafletMap) { leafletMap.remove(); leafletMap = null; }
+  latlngPunten = [];
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function wacht(ms) { return new Promise(r => setTimeout(r, ms)); }
