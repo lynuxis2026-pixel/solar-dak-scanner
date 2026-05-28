@@ -142,14 +142,12 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
 .counter { display: inline-block; }
 
 /* ── TEKEN SCHERM ── */
-#tekenScherm { display: none; max-width: 660px; margin: 0 auto; padding: 40px 20px 60px; }
+#tekenScherm { display: none; max-width: 720px; margin: 0 auto; padding: 40px 20px 60px; }
 .teken-header { text-align: center; margin-bottom: 22px; }
 .teken-header h2 { font-size: 22px; font-weight: 800; margin-bottom: 6px; }
 .teken-sub { font-size: 14px; color: #94A3B8; margin-bottom: 4px; }
-.canvas-wrap { position: relative; width: 100%; max-width: 620px; aspect-ratio: 1; margin: 0 auto 14px; background: #0F172A; border: 2px solid #334155; border-radius: 12px; overflow: hidden; cursor: crosshair; }
-.canvas-wrap.gesloten { cursor: default; border-color: var(--oranje); }
-#satellietImg { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
-#tekenCanvas { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; }
+#dakTekenMap { width: 100%; height: clamp(320px, 65vw, 560px); border-radius: 12px; border: 2px solid #334155; overflow: hidden; margin: 0 auto 14px; transition: border-color .3s; background: #0F172A; }
+#dakTekenMap.getekend { border-color: var(--oranje); }
 .opp-badge { text-align: center; font-size: 13px; color: #64748B; margin-bottom: 16px; min-height: 20px; }
 .opp-badge strong { color: var(--oranje); font-size: 17px; }
 .teken-acties { display: flex; gap: 10px; }
@@ -222,10 +220,7 @@ body { font-family: 'Segoe UI', system-ui, sans-serif; background: var(--donker)
     <span>Teken zo nauwkeurig mogelijk langs de dakrand. Hoe nauwkeuriger de contour, hoe preciezer de berekening. U kunt ook op <strong>Overslaan</strong> klikken voor automatische schatting.</span>
   </div>
 
-  <div class="canvas-wrap" id="canvasWrap">
-    <img id="satellietImg" alt="Satellietfoto" />
-    <canvas id="tekenCanvas"></canvas>
-  </div>
+  <div id="dakTekenMap"></div>
 
   <div class="opp-badge" id="oppBadge">Teken een omlijning om het dakoppervlak te berekenen</div>
 
@@ -380,11 +375,12 @@ let huidigeData = null;
 let panelActief = true;
 let gekozenType = 'woning';
 
-// Polygon drawing state
-let tekenPunten = [];
-let tekenGesloten = false;
-let mppHuidig = 0.092;
-let hoverPunt = null;
+// Google Maps drawing state
+let mapsLoaded = false;
+let dakTekenMap = null;
+let drawingMgr = null;
+let dakPolygon = null;
+let m2Getekend = 0;
 let locatieData = null;
 
 function selectType(el) {
@@ -417,157 +413,94 @@ function toonTekenScherm(data) {
   document.getElementById('startScherm').style.display = 'none';
   document.getElementById('tekenScherm').style.display = 'block';
   document.getElementById('tekenAdresLabel').textContent = data.formatted_address;
-  mppHuidig = data.metersPerPixel || 0.092;
-  tekenPunten = [];
-  tekenGesloten = false;
-  hoverPunt = null;
+  locatieData = data;
+  m2Getekend = 0;
+  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
+  document.getElementById('dakTekenMap').classList.remove('getekend');
 
-  const img = document.getElementById('satellietImg');
-  if (data.kaartUrl) {
-    img.src = data.kaartUrl;
-    img.style.display = 'block';
-    document.getElementById('tekenInstructie').textContent = 'Klik op het dak om punten te plaatsen — klik op het groene startpunt om de omlijning te sluiten';
-  } else {
-    img.style.display = 'none';
-    document.getElementById('canvasWrap').style.background = 'linear-gradient(135deg, #1a2744, #2d3748)';
-    document.getElementById('tekenInstructie').textContent = 'Demo-modus: geen satellietfoto. Klik op Overslaan voor automatische schatting.';
+  if (!data.kaartUrl) {
+    document.getElementById('tekenInstructie').textContent = 'Demo-modus: geen kaart beschikbaar. Klik op Overslaan voor automatische schatting.';
+    bijwerkBtnAnalyseer(0);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+    return;
   }
 
-  const canvas = document.getElementById('tekenCanvas');
-  canvas.width = 1280; canvas.height = 1280;
-  canvas.style.cursor = 'crosshair';
-  document.getElementById('canvasWrap').classList.remove('gesloten');
+  document.getElementById('tekenInstructie').textContent = 'Zoom in op uw dak, teken de dakrand punt voor punt. Dubbelklik om de omlijning te sluiten.';
 
-  canvas.onclick = handleTekenKlik;
-  canvas.onmousemove = handleTekenHover;
-  canvas.onmouseleave = () => { hoverPunt = null; tekenCanvas(); };
-  canvas.ontouchstart = e => { e.preventDefault(); handleTekenKlik(e.touches[0]); };
+  // Extraheer API key uit de kaartUrl (die al naar client gestuurd wordt)
+  const mapsKey = new URL(data.kaartUrl).searchParams.get('key');
 
-  tekenCanvas();
-  bijwerkBtnAnalyseer();
+  if (!mapsLoaded) {
+    document.getElementById('tekenInstructie').textContent = 'Kaart laden…';
+    window._onMapsReady = () => { mapsLoaded = true; initDakTekenMap(data); };
+    const s = document.createElement('script');
+    s.src = `https://maps.googleapis.com/maps/api/js?key=${mapsKey}&libraries=drawing,geometry&callback=_onMapsReady`;
+    s.async = true; s.defer = true;
+    document.head.appendChild(s);
+  } else {
+    initDakTekenMap(data);
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
-function handleTekenKlik(e) {
-  if (tekenGesloten) return;
-  const pt = getCanvasPunt(e);
-  if (tekenPunten.length >= 3) {
-    const f = tekenPunten[0];
-    if (Math.hypot(pt.x - f.x, pt.y - f.y) < 20) { sluitPolygoon(); return; }
-  }
-  tekenPunten.push(pt);
-  tekenCanvas();
-  bijwerkBtnAnalyseer();
-}
+function initDakTekenMap(data) {
+  document.getElementById('tekenInstructie').textContent = 'Zoom in op uw dak, teken de dakrand punt voor punt. Dubbelklik om de omlijning te sluiten.';
+  const mapDiv = document.getElementById('dakTekenMap');
+  mapDiv.innerHTML = '';
 
-function handleTekenHover(e) {
-  if (tekenGesloten) return;
-  hoverPunt = getCanvasPunt(e);
-  const canvas = document.getElementById('tekenCanvas');
-  if (tekenPunten.length >= 3) {
-    const f = tekenPunten[0];
-    canvas.style.cursor = Math.hypot(hoverPunt.x - f.x, hoverPunt.y - f.y) < 20 ? 'pointer' : 'crosshair';
-  }
-  tekenCanvas();
-}
-
-function getCanvasPunt(e) {
-  const canvas = document.getElementById('tekenCanvas');
-  const rect = canvas.getBoundingClientRect();
-  const cx = e.clientX ?? (e.touches ? e.touches[0].clientX : 0);
-  const cy = e.clientY ?? (e.touches ? e.touches[0].clientY : 0);
-  return { x: (cx - rect.left) * (canvas.width / rect.width), y: (cy - rect.top) * (canvas.height / rect.height) };
-}
-
-function sluitPolygoon() {
-  if (tekenPunten.length < 3) return;
-  tekenGesloten = true;
-  hoverPunt = null;
-  document.getElementById('tekenCanvas').style.cursor = 'default';
-  document.getElementById('canvasWrap').classList.add('gesloten');
-  tekenCanvas();
-  bijwerkBtnAnalyseer();
-}
-
-function tekenCanvas() {
-  const canvas = document.getElementById('tekenCanvas');
-  const ctx = canvas.getContext('2d');
-  ctx.clearRect(0, 0, canvas.width, canvas.height);
-  if (!tekenPunten.length && !hoverPunt) return;
-  const pts = tekenPunten;
-
-  if (tekenGesloten && pts.length >= 3) {
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    ctx.closePath();
-    ctx.fillStyle = 'rgba(249,115,22,0.22)';
-    ctx.fill();
-  }
-  if (pts.length >= 2) {
-    ctx.strokeStyle = 'rgba(249,115,22,0.9)';
-    ctx.lineWidth = 2; ctx.setLineDash([]);
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    pts.slice(1).forEach(p => ctx.lineTo(p.x, p.y));
-    if (tekenGesloten) ctx.closePath();
-    ctx.stroke();
-  }
-  if (!tekenGesloten && hoverPunt && pts.length) {
-    ctx.strokeStyle = 'rgba(249,115,22,0.4)';
-    ctx.lineWidth = 1.5; ctx.setLineDash([5, 4]);
-    ctx.beginPath();
-    ctx.moveTo(pts[pts.length - 1].x, pts[pts.length - 1].y);
-    ctx.lineTo(hoverPunt.x, hoverPunt.y);
-    ctx.stroke(); ctx.setLineDash([]);
-  }
-  pts.forEach((p, i) => {
-    ctx.beginPath(); ctx.arc(p.x, p.y, i === 0 ? 7 : 4, 0, Math.PI * 2);
-    ctx.fillStyle = i === 0 ? '#10B981' : '#F97316'; ctx.fill();
-    ctx.strokeStyle = '#fff'; ctx.lineWidth = 1.5; ctx.stroke();
+  dakTekenMap = new google.maps.Map(mapDiv, {
+    center: { lat: data.lat, lng: data.lng },
+    zoom: 20,
+    mapTypeId: 'satellite',
+    tilt: 0,
+    streetViewControl: false,
+    mapTypeControl: false,
+    fullscreenControl: true,
+    zoomControl: true,
+    gestureHandling: 'greedy',
+    mapId: 'solar_dak'
   });
-  if (!tekenGesloten && hoverPunt) {
-    ctx.beginPath(); ctx.arc(hoverPunt.x, hoverPunt.y, 4, 0, Math.PI * 2);
-    ctx.fillStyle = 'rgba(249,115,22,0.55)'; ctx.fill();
-  }
-  if (tekenGesloten && pts.length >= 3) {
-    const m2 = berekenOppervlak();
-    const cx = pts.reduce((s, p) => s + p.x, 0) / pts.length;
-    const cy = pts.reduce((s, p) => s + p.y, 0) / pts.length;
-    const label = Math.round(m2) + ' m²';
-    ctx.font = 'bold 15px Segoe UI,sans-serif';
-    const w = ctx.measureText(label).width;
-    ctx.fillStyle = 'rgba(0,0,0,0.6)'; ctx.beginPath();
-    ctx.roundRect(cx - w/2 - 8, cy - 12, w + 16, 24, 6); ctx.fill();
-    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-    ctx.fillText(label, cx, cy);
-  }
+
+  drawingMgr = new google.maps.drawing.DrawingManager({
+    drawingMode: google.maps.drawing.OverlayType.POLYGON,
+    drawingControl: false,
+    polygonOptions: {
+      fillColor: '#F97316',
+      fillOpacity: 0.22,
+      strokeColor: '#F97316',
+      strokeOpacity: 0.95,
+      strokeWeight: 2.5,
+      editable: true,
+      draggable: false
+    }
+  });
+  drawingMgr.setMap(dakTekenMap);
+
+  google.maps.event.addListener(drawingMgr, 'polygoncomplete', poly => {
+    dakPolygon = poly;
+    drawingMgr.setDrawingMode(null);
+    document.getElementById('dakTekenMap').classList.add('getekend');
+
+    const herbereken = () => {
+      m2Getekend = Math.round(google.maps.geometry.spherical.computeArea(dakPolygon.getPath()));
+      bijwerkBtnAnalyseer(m2Getekend);
+    };
+    herbereken();
+    ['set_at', 'insert_at', 'remove_at'].forEach(ev =>
+      dakPolygon.getPath().addListener(ev, herbereken)
+    );
+  });
+
+  bijwerkBtnAnalyseer(0);
 }
 
-function berekenOppervlak() {
-  if (tekenPunten.length < 3) return 0;
-  let area = 0;
-  const n = tekenPunten.length;
-  for (let i = 0; i < n; i++) {
-    const j = (i + 1) % n;
-    area += tekenPunten[i].x * tekenPunten[j].y;
-    area -= tekenPunten[j].x * tekenPunten[i].y;
-  }
-  return Math.abs(area) / 2 * mppHuidig * mppHuidig;
-}
-
-function bijwerkBtnAnalyseer() {
-  const m2 = berekenOppervlak();
+function bijwerkBtnAnalyseer(m2) {
   const btn = document.getElementById('btnAnalyseer');
   const badge = document.getElementById('oppBadge');
-  if (tekenGesloten && m2 > 0) {
+  if (m2 > 0) {
     btn.disabled = false;
-    btn.textContent = 'Analyseer dak (' + Math.round(m2) + ' m²)';
-    badge.innerHTML = 'Getekend oppervlak: <strong>' + Math.round(m2) + ' m²</strong>';
-  } else if (tekenPunten.length > 0) {
-    btn.disabled = true;
-    btn.textContent = tekenPunten.length + ' punten — klik op startpunt om te sluiten';
-    badge.innerHTML = tekenPunten.length + ' punt' + (tekenPunten.length !== 1 ? 'en' : '') + ' geplaatst &mdash; klik op het groene punt om te sluiten';
+    btn.textContent = 'Analyseer dak (' + m2 + ' m²)';
+    badge.innerHTML = 'Getekend oppervlak: <strong>' + m2 + ' m²</strong>';
   } else {
     btn.disabled = true;
     btn.textContent = 'Analyseer dak';
@@ -576,10 +509,11 @@ function bijwerkBtnAnalyseer() {
 }
 
 function resetPolygoon() {
-  tekenPunten = []; tekenGesloten = false; hoverPunt = null;
-  document.getElementById('tekenCanvas').style.cursor = 'crosshair';
-  document.getElementById('canvasWrap').classList.remove('gesloten');
-  tekenCanvas(); bijwerkBtnAnalyseer();
+  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
+  m2Getekend = 0;
+  document.getElementById('dakTekenMap').classList.remove('getekend');
+  if (drawingMgr) drawingMgr.setDrawingMode(google.maps.drawing.OverlayType.POLYGON);
+  bijwerkBtnAnalyseer(0);
 }
 
 function slaPolygoonOver() {
@@ -587,11 +521,10 @@ function slaPolygoonOver() {
 }
 
 async function voerAnalyseMetPolygoon() {
-  const m2 = berekenOppervlak();
   voerAnalyseUit({
     adres: locatieData?.formatted_address || document.getElementById('adresInput').value.trim(),
     gebouwType: gekozenType,
-    handmatigOppervlak: m2 > 5 ? Math.round(m2) : undefined
+    handmatigOppervlak: m2Getekend > 5 ? m2Getekend : undefined
   });
 }
 
@@ -902,7 +835,8 @@ function nieuweAnalyse() {
   document.getElementById('tekenScherm').style.display = 'none';
   document.getElementById('startScherm').style.display = 'block';
   document.getElementById('adresInput').value = '';
-  locatieData = null; tekenPunten = []; tekenGesloten = false;
+  locatieData = null; m2Getekend = 0;
+  if (dakPolygon) { dakPolygon.setMap(null); dakPolygon = null; }
   window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 function wacht(ms) { return new Promise(r => setTimeout(r, ms)); }
